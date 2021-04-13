@@ -1,0 +1,55 @@
+---- TRACES INGLES
+
+SELECT CAST(StartTime AS DATE) AS DATA, COUNT(*) AS QTDE, MIN(Duration) AS MIN_DURATION
+FROM Traces.dbo.Queries_Profile A
+WHERE DATEPART(dw,StartTime) between 2 and 6 -- Só de segunda a sexta
+--    and (StartTime <= '20141220' or StartTime >= '20150105') -- retira período de festas
+	and datepart(hh,StartTime) between 7 and 19 -- Só em um horário com mais utilização
+group by cast(StartTime as DATE)
+order by 1 
+
+
+SELECT CAST(Dt_Log AS DATE) AS DATA, AVG(cast(Value as bigint)) AS Média, MIN(cast(Value as bigint)) AS Mínimo, MAX(cast(Value as bigint)) AS Máximo
+FROM Traces.dbo.Log_Counter A
+    JOIN Traces.dbo.SQL_Counter B ON A.Id_Counter = B.Id_Counter
+WHERE DATEPART(dw,Dt_Log) between 2 and 6 -- Só de segunda a sexta
+--    and (Dt_Log <= '20141220' or Dt_Log >= '20150105') -- retira período de festas
+and datepart(hh,Dt_Log) between 7 and 19 -- Só em um horário com mais utilização
+and B.Nm_Counter = 'CPU'
+group by cast(Dt_Log as DATE)
+order by 1 
+
+SELECT CAST(Dt_Log AS DATE) AS DATA, AVG(cast(Value as bigint)) AS Média, MIN(cast(Value as bigint)) AS Mínimo, MAX(cast(Value as bigint)) AS Máximo
+FROM Traces.dbo.Log_Counter A
+    JOIN Traces.dbo.SQL_Counter B ON A.Id_Counter = B.Id_Counter
+WHERE DATEPART(dw,Dt_Log) between 2 and 6 -- Só de segunda a sexta
+--    and (Dt_Log <= '20141220' or Dt_Log >= '20150105') -- retira período de festas
+and datepart(hh,Dt_Log) between 7 and 19 -- Só em um horário com mais utilização
+and B.Nm_Counter = 'Page Life Expectancy'
+group by cast(Dt_Log as DATE)
+order by 1 
+
+SELECT CAST(Dt_Log AS DATE) AS DATA, AVG(cast(Value as bigint)) AS Média, MIN(cast(Value as bigint)) AS Mínimo, MAX(cast(Value as bigint)) AS Máximo
+FROM Traces.dbo.Log_Counter A
+    JOIN Traces.dbo.SQL_Counter B ON A.Id_Counter = B.Id_Counter
+WHERE DATEPART(dw,Dt_Log) between 2 and 6 -- Só de segunda a sexta
+--    and (Dt_Log <= '20141220' or Dt_Log >= '20150105') -- retira período de festas
+and datepart(hh,Dt_Log) between 7 and 19 -- Só em um horário com mais utilização
+and B.Nm_Counter = 'BatchRequests'
+group by cast(Dt_Log as DATE)
+order by 1 
+
+
+
+
+SELECT Dt_Log, Value, Nm_Counter
+FROM Traces.dbo.Log_Counter A
+    JOIN Traces.dbo.SQL_Counter B ON A.Id_Counter = B.Id_Counter
+WHERE DATEPART(dw,Dt_Log) between 2 and 6 -- Só de segunda a sexta
+--    and (Dt_Log <= '20141220' or Dt_Log >= '20150105') -- retira período de festas
+and datepart(hh,Dt_Log) between 7 and 19 -- Só em um horário com mais utilização
+and B.Nm_Counter = 'Page Life Expectancy'
+and Dt_Log >= '20210405'
+order by Dt_Log DESC
+
+

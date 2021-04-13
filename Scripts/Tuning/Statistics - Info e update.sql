@@ -25,28 +25,19 @@ ORDER BY ObjectType,
 
 
 
--- SCRIPT PARA PEGAR AS STATISTICAS
- SELECT DISTINCT st.[NAME], STP.ROWS, STP.ROWS_SAMPLED ,' UPDATE STATISTICS ' +'['+ss.name+']'+'.['+OBJECT_NAME(st.object_id) +']'+' '+'['+st.name +']'+ ' WITH FULLSCAN'
+SELECT DISTINCT STA.name,st.[NAME], STP.ROWS, STP.ROWS_SAMPLED ,
+ (rows_sampled * 100)/stp.rows AS SamplePercent,
+ rowmodctr,
+ last_updated AS LastUpdated,
+ ' UPDATE STATISTICS ' +'['+ss.name+']'+'.['+OBJECT_NAME(st.object_id) +']'+' '+'['+st.name +']'+ ' WITH FULLSCAN, MAXDOP=1'
  FROM SYS.STATS AS ST
  CROSS APPLY SYS.DM_DB_STATS_PROPERTIES (ST.OBJECT_ID, ST.STATS_ID) AS STP
  JOIN SYS.TABLES STA ON st.[object_id] = sta.object_id
  JOIN sys.schemas ss on ss.schema_id = STA.schema_id
- WHERE [ROWS] <> ROWS_SAMPLED
- AND STA.name = 'DIM_FORNECEDOR'
- ORDER BY [ROWS] DESC
-
-
-SELECT stats.name AS StatisticsName,
-OBJECT_SCHEMA_NAME(stats.object_id) AS SchemaName,
-OBJECT_NAME(stats.object_id) AS TableName,
-last_updated AS LastUpdated, [rows] AS [Rows],
-rows_sampled, steps, modification_counter AS ModCounter,
-persisted_sample_percent PersistedSamplePercent,
-(rows_sampled * 100)/rows AS SamplePercent
-FROM sys.stats
-INNER JOIN sys.stats_columns sc
-ON stats.stats_id = sc.stats_id AND stats.object_id = sc.object_id
-INNER JOIN sys.all_columns ac
-ON ac.column_id = sc.column_id AND ac.object_id = sc.object_id
-CROSS APPLY sys.dm_db_stats_properties(stats.object_id, stats.stats_id) shr
-WHERE OBJECT_NAME(stats.object_id) =''
+ join sys.sysobjects B with(nolock) on st.object_id = B.id
+	join sys.sysindexes C with(nolock) on C.id = B.id and st.Name = C.Name
+ WHERE 1=1
+ and (rows_sampled * 100)/stp.rows <=80
+ --AND STA.name in('NOTA_FISCAL','PEDIDO','ITEM')
+ and last_updated < '20210411'
+ ORDER BY last_updated

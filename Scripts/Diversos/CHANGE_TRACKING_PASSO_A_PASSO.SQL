@@ -91,3 +91,6 @@ DISABLE CHANGE_TRACKING;
 --DESABILITANDO CT NA BASE
 ALTER DATABASE [DATABASE_NAME]  
 SET CHANGE_TRACKING = OFF  
+
+
+--https://sirsql.net/tag/spflushcommittableondemand/

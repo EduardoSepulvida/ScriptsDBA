@@ -1,18 +1,18 @@
 --Acompanhar a criação ou desfragmentação do índice
+
+DECLARE @SPID INT = 118;
+
 SELECT node_id,physical_operator_name, SUM(row_count) row_count, 
   SUM(estimate_row_count) AS estimate_row_count, 
   CAST(SUM(row_count)*100 AS float)/SUM(estimate_row_count)  percent_completed
 FROM sys.dm_exec_query_profiles   
-WHERE session_id= (113)
+WHERE session_id= (@SPID)
 GROUP BY node_id,physical_operator_name  
 ORDER BY node_id;
 
 
-
-
-
 --Acompanhar a criação ou desfragmentação do índice
-DECLARE @SPID INT = 51;
+
 
 ;WITH agg AS
 (

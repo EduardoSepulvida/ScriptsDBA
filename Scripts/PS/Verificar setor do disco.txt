@@ -1,0 +1,6 @@
+
+setor fisico:
+fsutil fsinfo ntfsinfo LETRA:
+
+gwmi win32_volume | select name,BlockSize,FileSystem
+

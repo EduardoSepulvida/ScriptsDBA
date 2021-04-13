@@ -1,0 +1,120 @@
+USE [Traces]
+GO
+/****** Object:  StoredProcedure [dbo].[stpUpdate_Statistics]    Script Date: 12/04/2021 18:50:52 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+
+
+ALTER procedure [dbo].[stpUpdate_Statistics]
+AS
+	-- TRATAMENTO DE LOCK
+	SET LOCK_TIMEOUT 300000		-- Se ficar bloqueado por mais de 5 minutos, aborta.
+
+	-- PARA CLIENTES GRANDES
+	--IF( (SELECT DATEPART(WEEKDAY, GETDATE())) <> 1 )
+	--BEGIN		-- SEG A SAB
+	--	SET LOCK_TIMEOUT 300000		-- Se ficar bloqueado por mais de 5 minutos, aborta.
+	--END
+	--ELSE		
+	--BEGIN		-- DOMINGO
+	--	SET LOCK_TIMEOUT 3600000	-- Se ficar bloqueado por mais de 60 minutos, aborta.
+	--END
+
+	DECLARE @SQL VARCHAR(max)  
+	DECLARE @DB sysname  
+
+	truncate table Traces.._Update_Statistics
+
+	DECLARE curDB CURSOR FORWARD_ONLY STATIC FOR  
+	SELECT A.[name]  
+	FROM master.sys.databases A
+	LEFT JOIN [dbo].[Ignore_Databases] B ON A.[name] = B.[Nm_Database]
+	WHERE 
+		A.[name] NOT IN ('tempdb','ReportServerTempDB','model','master','msdb') 
+		and A.state_desc = 'ONLINE'
+		and B.[Nm_Database] IS NULL		-- DESCONSIDERAR DATABASES
+	ORDER BY A.[name]
+	         
+	OPEN curDB  
+	FETCH NEXT FROM curDB INTO @DB  
+	WHILE @@FETCH_STATUS = 0  
+	   BEGIN  
+		   SELECT @SQL = 'USE [' + @DB +']' + CHAR(13) + 
+			 '
+			
+			;WITH Tamanho_Tabelas AS (
+					SELECT obj.Name, prt.rows
+					FROM sys.objects obj
+						JOIN sys.indexes idx on obj.object_id = idx.object_id
+						JOIN sys.partitions prt on obj.object_id = prt.object_id
+						JOIN sys.allocation_units alloc on alloc.container_id = prt.partition_id
+					WHERE obj.type = ''U'' AND idx.type not in (5,6) AND idx.index_id IN (0, 1) and prt.rows > 1000
+					GROUP BY obj.Name, prt.rows )		
+			    
+					
+
+			insert into Traces.._Update_Statistics(Ds_Comando,Nr_Linha)	
+			SELECT  ''if exists(select null	FROM [' + @DB + '].sys.stats WHERE name = '''''' 
+					+ REPLACE(A.Name,'''''''','''''''''''') + '''''')
+					UPDATE STATISTICS [' + @DB + '].['' + schema_Name(E.schema_id) + ''].['' +B.Name + ''] '' +  ''['' + A.Name +'']''+ '' WITH FULLSCAN'', D.rows
+			FROM sys.stats A
+				CROSS APPLY SYS.DM_DB_STATS_PROPERTIES (A.OBJECT_ID, A.STATS_ID) AS STP
+				join sys.sysobjects B with(nolock) on A.object_id = B.id
+				join sys.sysindexes C with(nolock) on C.id = B.id and A.Name = C.Name
+				JOIN Tamanho_Tabelas D on  B.Name = D.Name 
+				join sys.tables E on E.object_id = A.object_id
+			WHERE  (C.rowmodctr > D.rows*.02 OR (rows_sampled * 100)/D.rows <=80 )
+				and C.rowmodctr > 100
+				and substring( B.Name,1,3) not in (''sys'',''dtp'')
+				and substring(  B.Name , 1,1) <> ''_'' -- elimina tabelas teporárias		
+			ORDER BY D.rows
+				
+		 '            
+		   exec (@SQL )
+	   --   select @SQL
+			set @SQL = ''
+	   
+		   FETCH NEXT FROM curDB INTO @DB  
+	   END  
+	   
+	CLOSE curDB  
+	DEALLOCATE curDB
+	
+	--select top 10 * from _Update_Statistics
+	
+ 	declare @Loop int, @Comando nvarchar(4000)
+	set @Loop = 1
+
+	while exists(select top 1 null from _Update_Statistics)
+	begin
+		-- Se passar de 6 da manha deve terminar a execução automaticamente
+		IF( ( (SELECT DATEPART(HOUR, GETDATE())) >= 5 ) AND ( (SELECT DATEPART(HOUR, GETDATE())) < 22 ) )
+		BEGIN		
+			RETURN
+		END
+
+		-- PARA CLIENTES GRANDES
+		-- Se passar de 6 da manha deve terminar a execução automaticamente
+		--IF( ( (SELECT DATEPART(WEEKDAY, GETDATE())) <> 1 ) AND  (SELECT DATEPART(HOUR, GETDATE())) >= 6 )
+		--BEGIN		-- SEG A SAB - ATE AS 06 HORAS
+		--	RETURN
+		--END
+		--ELSE IF( ( (SELECT DATEPART(WEEKDAY, GETDATE())) = 1 ) AND  (SELECT DATEPART(HOUR, GETDATE())) >= 21 )
+		--BEGIN		-- DOMINGO - ATE AS 21 HORAS
+		--	RETURN
+		--END
+			
+		select top 1 @Comando = Ds_Comando,@Loop = Id_Statistics
+		from _Update_Statistics		
+		
+		EXECUTE sp_executesql @Comando
+
+		delete from _Update_Statistics
+		where Id_Statistics = @Loop
+
+		set @Loop = @Loop + 1 
+		
+	end
