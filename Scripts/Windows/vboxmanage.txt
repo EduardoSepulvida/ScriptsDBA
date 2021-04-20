@@ -1,0 +1,23 @@
+"C:\Program Files\Oracle\VirtualBox\VBoxManage.exe" 
+
+
+-- iniciar uma vm
+	"C:\Program Files\Oracle\VirtualBox\VBoxManage.exe" startvm Win201601	
+
+
+--enviar comando para desligar uma vm
+	--"remove o cabo"
+	VBoxManage controlvm Win201601 poweroff 
+
+	"salva o estado atual no disco"
+	VBoxManage controlvm Win201601 savestate
+
+	"envia sinal para desligar"
+	VBoxManage controlvm Win201601 acpipowerbutton
+
+	"C:\Program Files\Oracle\VirtualBox\VBoxManage.exe"  controlvm Win201601 poweroff 
+
+
+
+cmd gui:
+conhost.exe

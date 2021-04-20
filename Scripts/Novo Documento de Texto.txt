@@ -1,0 +1,3 @@
+--Affinity Mask e TF8002
+Quando usamos o affinity mask o SQL Server faz o "Hard binding", que é o vínculo de um scheduler com o core de cpu. 
+O TF8002 permite que os core habilitados no affinity mask sejam compartilhados entre os schedules, evitando problemas de gargalo.

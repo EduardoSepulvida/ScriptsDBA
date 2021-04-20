@@ -1,0 +1,2 @@
+fsutil fsinfo ntfsinfo M:
+fsutil fsinfo sectorInfo E:
