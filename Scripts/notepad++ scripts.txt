@@ -1,0 +1,6 @@
+^(.{4}) -posição 4
+
+\r\n\Z --REMOVER ULTIMA LINHA
+^ -inicio
+$ -fim da linha
+dir | rename-item -NewName {$_.name -replace "_headers",""}

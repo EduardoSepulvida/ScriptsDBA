@@ -1,3 +1,12 @@
+^(.{4}) -posição 4
+
+\r\n\Z --REMOVER ULTIMA LINHA
+^ -inicio
+$ -fim da linha
+
+
+dir | rename-item -NewName {$_.name -replace "_headers",""}
+
 -- Verificar tamanho do log
 dbcc sqlperf(logspace)
 
@@ -20,6 +29,8 @@ exec sp_whoisactive @get_task_info =2, @get_plans = 1, @delta_interval = 1, @sho
 
 sp_whoisactive @find_block_leaders = 1, @sort_order = '[blocked_session_count] DESC'
 
+--filtrando sp_whoisactive
+--EXEC sp_WhoIsActive @filter_type = 'login', @filter = 'sa'
 
 EXEC sp_whoisactive @get_outer_command = 1, @delta_interval = 1,@get_plans = 1,
 	@output_column_list = '[database_name][collection_time][d%][session_id][blocking_session_id][sql_text][login_name][wait_info][status][percent_complete][host_name][database_name][sql_command]'

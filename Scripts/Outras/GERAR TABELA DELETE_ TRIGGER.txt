@@ -1,0 +1,152 @@
+/*CREATE TRIGGER [dbo].[SE1_DTALTERACAO_010]
+ON [dbo].se1010
+FOR UPDATE, INSERT
+AS
+	BEGIN
+		UPDATE A
+		SET    e1_ydtalte = CONVERT(VARCHAR, GETDATE(), 112),
+				e1_yhralte = SUBSTRING(CONVERT(VARCHAR, GETDATE(), 8), 1, 5)
+		FROM   se1010 A
+				JOIN inserted B
+				ON A.r_e_c_n_o_ = B.r_e_c_n_o_
+	END 
+*/
+
+
+SET NOCOUNT ON
+
+IF OBJECT_ID('tempdb..#temp_tables') IS NOT NULL
+	DROP TABLE #temp_tables
+
+CREATE TABLE #temp_tables (
+	id int identity
+	,table_schema sysname
+	,table_name sysname
+)
+
+INSERT INTO #temp_tables (table_schema,table_name)
+VALUES
+	 ('dbo','ORC_TELEP')
+	,('dbo','SAI_ITENS')
+	,('dbo','MOVF')
+	,('dbo','CUSTO')
+	,('dbo','CUSTOS_M')
+	,('dbo','ENTR_ITENS')
+	,('dbo','ORC_PEDIDO')
+	,('dbo','SAI_MESTRE')
+	,('dbo','MOVP')
+	,('dbo','MOV_CTABIL')
+	,('dbo','ITEM_ESTAT')
+	,('dbo','SALDO')
+	,('dbo','ITENS')
+	,('dbo','ITEM_ESTAT_20200523')
+	,('dbo','HIST_PEDIDO_ITENS')
+	,('dbo','EQUIV')
+	,('dbo','CAIXA')
+	,('dbo','ENTR_MESTRE')
+	,('dbo','TITULOS')
+
+DECLARE  @COLUMN_DT sysname = 'BI_DTALTER'
+		,@COLUMN_HR sysname = 'BI_HRALTER'
+		,@COLUMN_DTDELETE sysname = 'BI_DTDELETE' --DELETE
+		,@COLUMN_HRDELETE sysname = 'BI_HRDELETE' --DELETE
+
+
+
+
+-----------------------
+
+
+IF OBJECT_ID('tempdb..#temp_table_constraints') IS NOT NULL
+	DROP TABLE #temp_table_constraints
+
+SELECT 
+	QUOTENAME(tb.TABLE_SCHEMA)TABLE_SCHEMA
+	,QUOTENAME(tb.TABLE_NAME)TABLE_NAME
+	,cl.COLUMN_NAME TABLE_COLUMN
+	,co.column_id COLUMN_ID
+	,ty.name DATA_TYPE
+	,co.max_length MAX_LENGTH
+	,co.precision PRECISION
+--INTO 
+--	#temp_table_constraints
+FROM
+    INFORMATION_SCHEMA.TABLE_CONSTRAINTS tb
+	JOIN 
+	INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE cl
+		ON 
+			cl.Constraint_Name = tb.Constraint_Name
+			AND cl.Table_Name = tb.Table_Name
+			AND tb.Constraint_Type IN ('PRIMARY KEY', 'UNIQUE')
+	JOIN 
+	#temp_tables tt
+		ON 
+			tt.table_name = tb.TABLE_NAME COLLATE SQL_Latin1_General_CP1_CI_AS
+			AND tt.table_schema = tb.TABLE_SCHEMA COLLATE SQL_Latin1_General_CP1_CI_AS
+	JOIN
+	sys.tables AS tab
+		ON tab.name = tt.table_name COLLATE SQL_Latin1_General_CP1_CI_AS
+		AND schema_name(tab.schema_id) = tt.table_schema COLLATE SQL_Latin1_General_CP1_CI_AS
+	JOIN 
+	sys.columns co
+        ON tab.object_id = co.object_id
+    LEFT JOIN sys.types ty
+    on co.user_type_id = ty.user_type_id
+		
+/*
+select schema_name(tab.schema_id) as schema_name,
+    tab.name as table_name, 
+    col.column_id,
+    col.name as column_name, 
+    t.name as data_type,    
+    col.max_length,
+    col.precision
+from sys.tables as tab
+    inner join sys.columns as col
+        on tab.object_id = col.object_id
+    left join sys.types as t
+    on col.user_type_id = t.user_type_id
+order by schema_name,
+    table_name, 
+    column_id;	
+	*/
+
+			
+/**/
+DECLARE @table_schema sysname
+		,@table_name sysname
+		,@table_column sysname
+
+
+PRINT '
+
+'
+PRINT 'USE '+QUOTENAME(DB_NAME())
+PRINT 'GO'
+
+/*
+WHILE (SELECT COUNT(1) FROM #temp_table_constraints) > 0
+BEGIN
+	SELECT @table_schema = tb.TABLE_SCHEMA ,@table_name = tb.TABLE_NAME, @table_column = TABLE_COLUMN FROM #temp_table_constraints tb ORDER BY table_schema, table_name, TABLE_COLUMN
+	
+	PRINT'
+CREATE TABLE DELETE_'+ PARSENAME(@table_name,1) +'(
+	TABELA			sysname
+	,BI_DTDELETE	varchar(8)
+	,BI_HRDELETE	varchar(5)'
+
+
+--WHILE @table_columns > 0
+--BEGIN
+	
+--END
+
+PRINT'
+)'
+
+	DELETE #temp_table_constraints  WHERE table_schema= @table_schema AND table_name = @table_name
+
+END
+
+
+*/
