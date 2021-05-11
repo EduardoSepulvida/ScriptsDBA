@@ -27,7 +27,31 @@ EXEC master.sys.sp_MSforeachdb ' USE [?];
 
 SELECT * FROM #ESPACO_DATABASES 
 
-
+--------------------
+SELECT
+DatabaseName = DB_NAME()
+,FilegroupName = FG.name
+,F.file_id
+,F.physical_name
+,F.name
+,F.file_id
+,SizeGB = F.size/131072
+,UsedGB = FILEPROPERTY(F.name,'SpaceUsed')/131072
+,L.*
+FROM
+sys.database_files F
+OUTER APPLY (
+SELECT
+LobGB = ISNULL(SUM(CASE WHEN AU.type_desc = 'LOB_DATA' THEN AU.total_pages ELSE 0 END)/131072,0)
+,RowOverflowGB = ISNULL(SUM(CASE WHEN AU.type_desc = 'ROW_OVERFLOW_DATA' THEN AU.total_pages ELSE 0 END)/131072,0)
+FROM
+sys.allocation_units AU
+WHERE
+AU.data_space_id = F.data_space_id
+) L
+JOIN
+sys.filegroups FG
+ON FG.data_space_id = F.data_space_id
 
 --------------------
 SELECT CONVERT(VARCHAR(25), DB.name) AS [Database],

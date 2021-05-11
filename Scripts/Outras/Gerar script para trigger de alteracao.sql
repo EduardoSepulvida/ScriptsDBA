@@ -1,15 +1,14 @@
-/*CREATE TRIGGER [dbo].[SE1_DTALTERACAO_010]
-ON [dbo].se1010
-FOR UPDATE, INSERT
+/*
+CREATE TRIGGER [dbo].[SE1_DTALTERACAO_010]
+ON [dbo].SE1010
+FOR UPDATE,INSERT
 AS
-	BEGIN
-		UPDATE A
-		SET    e1_ydtalte = CONVERT(VARCHAR, GETDATE(), 112),
-				e1_yhralte = SUBSTRING(CONVERT(VARCHAR, GETDATE(), 8), 1, 5)
-		FROM   se1010 A
-				JOIN inserted B
-				ON A.r_e_c_n_o_ = B.r_e_c_n_o_
-	END 
+BEGIN
+	 update A
+	 SET E1_YDTALTE = convert(varchar, getdate(), 112) ,E1_YHRALTE = substring(convert(varchar, getdate(), 8),1,5)
+	 from SE1010 A
+			join inserted B ON A.R_E_C_N_O_ = B.R_E_C_N_O_
+END
 */
 
 

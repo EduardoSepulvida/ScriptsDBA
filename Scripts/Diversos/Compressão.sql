@@ -22,6 +22,7 @@ IF (OBJECT_ID('tempdb..##TEMP_POWER_COMPRESSAO_DADOS_HEAP') IS NOT NULL)
 CREATE TABLE ##TEMP_POWER_COMPRESSAO_DADOS_HEAP (
 	[Nm_Database] [varchar](256)  NOT NULL,
 	[Table] [sysname] NOT NULL,
+	[Rows] nvarchar(256) NULL,
 	[Compression] [nvarchar](60) NULL,
 	[Ds_Comando] [nvarchar](312) NOT NULL
 ) ON [PRIMARY]
@@ -79,6 +80,7 @@ SELECT DISTINCT
 	   ''' + @DB + ''' AS [Nm_Database],
 	   [t].[name] AS [Table],
        [p].[data_compression_desc] AS [Compression], 
+	   [p].[rows],
        --[i].[fill_factor],
        ''ALTER TABLE [' + @DB + '].['' + [s].[name] + ''].['' + [t].[name] + ''] REBUILD WITH (DATA_COMPRESSION = PAGE)'' AS Ds_Comando
 FROM [sys].[partitions] AS [p]
@@ -104,5 +106,5 @@ CLOSE curDB
 DEALLOCATE curDB
 
 
-SELECT * FROM ##TEMP_POWER_COMPRESSAO_DADOS ORDER BY rows DESC
-SELECT * FROM ##TEMP_POWER_COMPRESSAO_DADOS_HEAP
+SELECT *   FROM ##TEMP_POWER_COMPRESSAO_DADOS ORDER BY rows DESC
+SELECT *   FROM ##TEMP_POWER_COMPRESSAO_DADOS_HEAP

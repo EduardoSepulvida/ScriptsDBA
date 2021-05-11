@@ -24,20 +24,19 @@ ORDER BY ObjectType,
 [18:01, 16/10/2020] +55 14 99818-0312: ou direto na estatística... usar o no_recompute
 
 
-
-SELECT DISTINCT STA.name,st.[NAME], STP.ROWS, STP.ROWS_SAMPLED ,
- (rows_sampled * 100)/stp.rows AS SamplePercent,
+SELECT DISTINCT STA.name,st.name, STP.rows, STP.rows_sampled ,
+ (rows_sampled * 100)/STP.rows AS SamplePercent,
  rowmodctr,
  last_updated AS LastUpdated,
  ' UPDATE STATISTICS ' +'['+ss.name+']'+'.['+OBJECT_NAME(st.object_id) +']'+' '+'['+st.name +']'+ ' WITH FULLSCAN, MAXDOP=1'
- FROM SYS.STATS AS ST
- CROSS APPLY SYS.DM_DB_STATS_PROPERTIES (ST.OBJECT_ID, ST.STATS_ID) AS STP
- JOIN SYS.TABLES STA ON st.[object_id] = sta.object_id
+ FROM sys.stats AS st
+ CROSS APPLY sys.dm_db_stats_properties (st.object_id, st.stats_id) AS STP
+ JOIN sys.tables STA ON st.[object_id] = STA.object_id
  JOIN sys.schemas ss on ss.schema_id = STA.schema_id
  join sys.sysobjects B with(nolock) on st.object_id = B.id
-	join sys.sysindexes C with(nolock) on C.id = B.id and st.Name = C.Name
+	join sys.sysindexes C with(nolock) on C.id = B.id and st.name = C.name
  WHERE 1=1
- and (rows_sampled * 100)/stp.rows <=80
+ and (rows_sampled * 100)/STP.rows <=80
  --AND STA.name in('NOTA_FISCAL','PEDIDO','ITEM')
- and last_updated < '20210411'
+ and last_updated < '202100505'
  ORDER BY last_updated
