@@ -28,6 +28,7 @@ EXEC master.sys.sp_MSforeachdb ' USE [?];
 SELECT * FROM #ESPACO_DATABASES 
 
 --------------------
+/*
 SELECT
 DatabaseName = DB_NAME()
 ,FilegroupName = FG.name
@@ -153,4 +154,5 @@ DBCC FREESYSTEMCACHE ('ALL')
 GO
 DBCC FREESESSIONCACHE
 GO
+*/
 */

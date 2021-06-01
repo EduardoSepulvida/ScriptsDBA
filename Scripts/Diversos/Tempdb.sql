@@ -1,5 +1,11 @@
 https://suporte.powertuning.com.br/kb/article/136456/tempdb-identificando-consumidores-de-espaco?preview=true&revisionId=469453
-
+Alter Database TempDB
+Modify File (
+Name = 'TempDev',
+Size = 1000 MB,
+MaxSize = 4000 MB,
+FileGrowth = 512 MB
+);
 
 USE tempdb;
 

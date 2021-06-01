@@ -3,7 +3,7 @@ T.name as 'Table',
 I.name as 'Index',
 DDIPS.avg_fragmentation_in_percent,
 DDIPS.page_count
-,'ALTER INDEX '+I.name +' ON '+S.name+'.'+T.name + 'REBUILD'
+,'ALTER INDEX '+I.name +' ON '+S.name+'.'+T.name + ' REBUILD'
 FROM sys.dm_db_index_physical_stats (DB_ID(), NULL, NULL, NULL, NULL) AS DDIPS
 INNER JOIN sys.tables T on T.object_id = DDIPS.object_id
 INNER JOIN sys.schemas S on T.schema_id = S.schema_id

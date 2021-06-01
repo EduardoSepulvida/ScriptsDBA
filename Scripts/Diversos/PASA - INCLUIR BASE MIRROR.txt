@@ -1,0 +1,165 @@
+
+/*
+
+
+Criação dos endpoints participantes do mirror
+--criar usuário do Endpoint como sysadmin nos servidores antes de criar os endpoints
+-- se o telnet não tiver funcionando pode ser o firewall do windows bloqueando
+
+
+-- Criação do Endpoint nos dois servidores
+CREATE ENDPOINT [Mirroring] 
+	AUTHORIZATION [DATACENTER\DBMirror]
+	STATE=STARTED
+	AS TCP (LISTENER_PORT = 5022, LISTENER_IP = ALL)
+	FOR DATA_MIRRORING (ROLE = ALL, AUTHENTICATION = WINDOWS NEGOTIATE
+, ENCRYPTION = DISABLED)
+
+
+-- Endpoint do witness
+
+CREATE ENDPOINT [Mirroring] 
+	AUTHORIZATION [DATACENTER\DBMirror]
+	STATE=STARTED
+	AS TCP (LISTENER_PORT = 5022, LISTENER_IP = ALL)
+	FOR DATA_MIRRORING (ROLE = WITNESS, AUTHENTICATION = WINDOWS NEGOTIATE
+, ENCRYPTION = DISABLED)
+
+
+
+*/
+-- fonte
+
+--http://tracyboggiano.com/archive/2014/02/script-to-setup-sql-server-database-mirroring-for-multiple-databases/
+
+
+--parar o backup do Log
+SET NOCOUNT ON
+
+ -- Garantir que os caminhos das databases não serão alterados.
+ -- adicionei COMPRESSION no backup pois o servidor é SQL Server 2008 R2.
+
+DECLARE @primary VARCHAR(128) = 'BD01.datacenter.corp' ,
+    @secondary VARCHAR(128) = 'BD02.datacenter.corp' ,
+    @witness varchar(128) = '',
+    @account VARCHAR(128) = 'bdmirror' ,
+    @backupnetworkpath varchar(128) = '\\BD02\d$\Backup\',
+    @command VARCHAR(MAX) ,
+    @command2 VARCHAR(MAX) ,
+    @rowcount TINYINT = 0 ,
+    @mirroringmode varchar(4) = 'FULL',  --OFF or FULL
+    @newmirror BIT = 0 --if mirroring has not been setup before create the endpoints
+
+IF @mirroringmode = 'OFF' OR @mirroringmode = 'FULL'
+BEGIN
+    CREATE TABLE #databases ( name VARCHAR(128) )
+    INSERT  INTO #databases
+    SELECT  name
+    FROM    sys.databases d
+            LEFT OUTER JOIN sys.database_mirroring m ON m.database_id = d.database_id
+    WHERE   name NOT IN ( 'dba', 'tempdb', 'master', 'msdb', 'model' )
+            AND mirroring_role_desc IS NULL
+            and name in ('OnlineDoctorPasa')  -- NOME DA BASE- alterar aqui *******************************OLHE AQUI*************
+
+    SET @rowcount = @@rowcount
+
+    IF @rowcount > 0 
+    BEGIN
+        PRINT ':CONNECT ' + @primary
+
+        SELECT  'ALTER DATABASE [' + name
+                + '] SET RECOVERY FULL WITH NO_WAIT'
+        FROM    #databases
+
+		 IF @newmirror = 1 
+			BEGIN 
+				PRINT ''
+				PRINT 'IF  NOT EXISTS (SELECT * FROM sys.endpoints e WHERE e.name = N''Mirroring'')' 
+				PRINT 'CREATE ENDPOINT [Mirroring] AUTHORIZATION [' + @account
+					+ '] STATE=STARTED AS TCP (LISTENER_PORT = 5022, LISTENER_IP = ALL) FOR DATA_MIRRORING (ROLE = PARTNER, AUTHENTICATION = WINDOWS NEGOTIATE, ENCRYPTION = REQUIRED ALGORITHM RC4)'
+
+				PRINT ' GO'
+				PRINT ''
+				PRINT ':CONNECT ' + @secondary
+
+				PRINT 'IF  NOT EXISTS (SELECT * FROM sys.endpoints e WHERE e.name = N''Mirroring'')' 
+				PRINT 'CREATE ENDPOINT [Mirroring] AUTHORIZATION [' + @account
+					+ '] STATE=STARTED AS TCP (LISTENER_PORT = 5022, LISTENER_IP = ALL) FOR DATA_MIRRORING (ROLE = PARTNER, AUTHENTICATION = WINDOWS NEGOTIATE, ENCRYPTION = REQUIRED ALGORITHM RC4)'
+				PRINT 'GO'
+
+			END
+
+            PRINT ''
+            PRINT ':CONNECT ' + @primary
+            SELECT  'BACKUP DATABASE [' + name + '] TO  DISK = N''' + @backupnetworkpath + name
+                    + '.bak'' WITH NOFORMAT, INIT,  NAME = N''' + name
+                    + '-Full Database Backup'', SKIP, NOREWIND, NOUNLOAD,  STATS = 10, COMPRESSION'
+            FROM    #databases
+
+            PRINT ''
+            SELECT  'BACKUP LOG [' + name + '] TO  DISK = N''' + @backupnetworkpath + name
+                    + '_Log.bak'' WITH NOFORMAT, INIT,  NAME = N''' + name
+                    + '-Transaction Log  Backup'', SKIP, NOREWIND, NOUNLOAD,  STATS = 10, COMPRESSION'
+            FROM    #databases
+
+             PRINT ''
+            PRINT ':CONNECT ' + @secondary
+            SELECT  'RESTORE DATABASE [' + name + '] FROM  DISK = N''' + @backupnetworkpath + name
+                    + '.bak'' WITH  FILE = 1,  NORECOVERY,  NOUNLOAD,  REPLACE, STATS = 10'
+            FROM    #databases
+
+            SELECT  'RESTORE LOG [' + name + '] FROM  DISK = N''' + @backupnetworkpath + name
+                    + '_log.bak'' WITH  FILE = 1,  NORECOVERY,  NOUNLOAD,  STATS = 10'
+            FROM    #databases
+
+            PRINT ''
+
+            PRINT ':CONNECT ' + @secondary
+
+            SELECT  'ALTER DATABASE [' + name + '] SET PARTNER = N''TCP://' + @primary + ':5022'''
+            FROM    #databases
+
+            PRINT ''
+            
+            SELECT  'ALTER DATABASE [' + name + '] SET witness = N''TCP://' + @witness + ':5022'''
+            FROM    #databases
+
+            PRINT ''
+            
+
+
+            PRINT ':CONNECT ' + @primary
+
+            SELECT  'ALTER DATABASE [' + name + '] SET PARTNER = N''TCP://' + @secondary + ':5022'''
+            FROM    #databases
+
+             PRINT ''
+
+            SELECT  'ALTER DATABASE [' + name + '] SET SAFETY ' + @mirroringmode
+            FROM    #databases
+
+            PRINT ''
+
+            SELECT  'ALTER DATABASE [' + name + '] SET PARTNER TIMEOUT 60'
+            FROM    #databases
+            
+            
+            
+
+            PRINT ''
+
+             IF @newmirror = 1 
+                PRINT 'exec sys.sp_dbmmonitoraddmonitoring'
+
+            IF @newmirror = 1 
+                BEGIN 
+                    PRINT ''
+                    PRINT ':CONNECT ' + @secondary
+                    PRINT 'exec sys.sp_dbmmonitoraddmonitoring'
+                END
+        END
+
+
+    DROP TABLE #databases 
+
+END

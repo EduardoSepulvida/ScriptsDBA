@@ -22,7 +22,7 @@ FROM sys.dm_exec_requests AS R
 SELECT plan_handle, st.text  
 FROM sys.dm_exec_cached_plans   
 CROSS APPLY sys.dm_exec_sql_text(plan_handle) AS st  
-WHERE text LIKE N'% trecho da consulta %';
+WHERE text LIKE N'%busca%';
 
 
 select * from sys.dm_exec_query_plan(0x0600180052E4CE0EC0B078F07B00000001000000000000000000000000000000000000000000000000000000)

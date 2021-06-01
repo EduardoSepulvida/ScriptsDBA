@@ -2,22 +2,6 @@ DBCC FREEPROCCACHE;
 
 OPTION(RECOMPILE, QUERYTRACEON 9481)
 
-SELECT SCHEMA_NAME(schema_id) AS SchemaName,
-       OBJECT_NAME(o.object_id) AS ObjectName,
-       type AS ObjectType,
-       s.name AS StatsName,
-       STATS_DATE(o.object_id, stats_id) AS StatsDate
-FROM sys.stats s
-    INNER JOIN sys.objects o
-        ON o.object_id = s.object_id
-WHERE OBJECTPROPERTY(o.object_id, N'ISMSShipped') = 0
-      AND LEFT(s.name, 4) != '_WA_'
-ORDER BY ObjectType,
-         SchemaName,
-         ObjectName,
-         StatsName;
-
-
 
 --DESABILITAR AUTO STATISTICS NA TABELA
 [18:00, 16/10/2020] +55 14 99818-0312: e pra quem te procurando a reposta... pra desligar o auto update na tabela, só chamar a sp_autostats...
@@ -38,5 +22,47 @@ SELECT DISTINCT STA.name,st.name, STP.rows, STP.rows_sampled ,
  WHERE 1=1
  and (rows_sampled * 100)/STP.rows <=80
  --AND STA.name in('NOTA_FISCAL','PEDIDO','ITEM')
- and last_updated < '202100505'
+ and last_updated < '20210517'
  ORDER BY last_updated
+ 
+ 
+ --RODRIGO
+ 
+IF OBJECT_ID('tempdb..#Tabs') IS NOT NULL
+    DROP TABLE #Tabs;
+
+
+SELECT
+     DBName = DB_NAME()
+    ,ObjName = QUOTENAME(Q.name)+'.'+QUOTENAME(T.name)
+    ,R.* 
+    ,S.*
+INTO #Tabs 
+FROM 
+    sys.tables T CROSS APPLY (
+        SELECT rows = SUM(P.rows) FROM sys.partitions P WHERE P.index_id <= 1 AND P.object_id = T.object_id
+    ) R
+    CROSS APPLY (
+        SELECT TotalStats = COUNT(*)
+        ,MinUp = MIN(STATS_DATE(S.object_id,S.stats_id))
+        ,MaxUp = MAX(STATS_DATE(S.object_id,S.stats_id))
+        FROM sys.stats S WHERE S.object_id = T.object_id
+    ) S
+    INNER JOIN
+    sys.schemas Q
+        ON Q.schema_id = T.schema_id
+
+
+SELECT
+    *
+    ,'USE '+QUOTENAME(DbName)+'; UPDATE STATISTICS '+ObjName+' WITH FULLSCAN'
+FROM
+    #Tabs
+WHERE
+    TotalStats >= 1
+    AND
+    MaxUp <= DATEADD(dd,-7,GETDATE())
+ORDER BY
+    rows
+
+

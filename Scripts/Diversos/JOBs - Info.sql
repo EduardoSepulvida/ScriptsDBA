@@ -1,5 +1,6 @@
 select * from msdb.dbo.sysjobs where CONVERT(binary(16), job_id)=0x621E528F3E3FC644815DB761F640A7A4
 
+select * from msdb.dbo.sysjobs where CONVERT(binary(16), job_id)=
 
 -- Listando todos os jobs
 SELECT
