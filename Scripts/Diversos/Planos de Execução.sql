@@ -18,11 +18,10 @@ FROM sys.dm_exec_requests AS R
    CROSS APPLY sys.dm_exec_sql_text(R.plan_handle) ST
    WHERE  ST.text like '%vt1090%'
 
-
-SELECT plan_handle, st.text  
+SELECT 'DBCC FREEPROCCACHE(',plan_handle,')', st.text  
 FROM sys.dm_exec_cached_plans   
 CROSS APPLY sys.dm_exec_sql_text(plan_handle) AS st  
-WHERE text LIKE N'%busca%';
+WHERE text LIKE N'%CT2120%CT2_DATA%CT2_CREDIT%CT2_CCC%'
 
 
 select * from sys.dm_exec_query_plan(0x0600180052E4CE0EC0B078F07B00000001000000000000000000000000000000000000000000000000000000)
