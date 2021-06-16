@@ -21,6 +21,15 @@ AND ssu.database_id = 2
 ORDER BY allocated DESC
 
 
+
+DBCC OPENTRAN
+
+SELECT * 
+FROM sys.dm_tran_active_transactions
+where transaction_uow IS NOT NULL
+
+
+
 =================================
 
 SELECT A.session_id,B.host_name, B.Login_Name ,

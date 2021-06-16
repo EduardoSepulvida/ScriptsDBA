@@ -51,8 +51,7 @@ OUTER APPLY(
 )prefix_final
 
 WHERE 
-	tab.name like 'VIX_PRO_003%'  
-	OR tab.name like 'SB9%'
+	tab.name like 'SB9%'
 	OR tab.name like 'CT2%'
 	OR tab.name like 'SBZ%'
 	OR tab.name like 'SD2%'
@@ -95,7 +94,7 @@ WHERE
 --TAB: DESCONSIDERAR
 select * from #temp_tables where len(table_name) > 6 AND table_name NOT IN ('VIX_PRO_003','SD398')
 
-DELETE #temp_tables where len(table_name) > 6 AND table_name NOT IN ('VIX_PRO_003','SD398')
+DELETE #temp_tables where len(table_name) > 6 AND table_name IN ('VIX_PRO_003','SD398')
 
 -- TAB: CONSIDERAR
 select * from #temp_tables

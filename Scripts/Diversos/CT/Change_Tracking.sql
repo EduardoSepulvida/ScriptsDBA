@@ -39,6 +39,19 @@ SET CHANGE_TRACKING = OFF
 
 
 -----------------------------------------------------------------------------
+DECLARE @Context varbinary(128) = CAST('1 - UPDATE' AS varbinary(128));
+ 
+WITH CHANGE_TRACKING_CONTEXT (@Context) 
+ UPDATE TOP(1) CT_Teste SET NOME = 'EDUARDO'
+
+select *,CAST(ct.SYS_CHANGE_CONTEXT as varchar(255))  From CHANGETABLE(CHANGES StackOverflow2010..CT_Teste, 0) AS CT   
+
+
+
+
+SELECT CHANGE_TRACKING_CURRENT_VERSION(); 
+
+
 SELECT * FROM CT_Teste
 
 UPDATE CT_Teste SET NOME = 'Eduardo' WHERE ID = 1
