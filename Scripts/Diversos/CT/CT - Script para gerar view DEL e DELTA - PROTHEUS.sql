@@ -92,9 +92,9 @@ WHERE
 
 
 --TAB: DESCONSIDERAR
-select * from #temp_tables where len(table_name) > 6 AND table_name NOT IN ('VIX_PRO_003','SD398')
+select * from #temp_tables where len(table_name) > 6 OR table_name IN ('SD398')
 
-DELETE #temp_tables where len(table_name) > 6 AND table_name IN ('VIX_PRO_003','SD398')
+DELETE #temp_tables where len(table_name) > 6 OR table_name IN ('SD398')
 
 -- TAB: CONSIDERAR
 select * from #temp_tables

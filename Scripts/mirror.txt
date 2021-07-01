@@ -1,0 +1,26 @@
+requisitos:
+
+Servidores precisam estar sobre o mesmo dominio para que não seja necessário criar certificados de segurançã entre eles.
+-> melhor caminho
+
+serviços do sql com usuarios do AD 
+	(senão precisa coloca-los com certificados por questão de segurança)
+	
+	
+
+criar endpoints na porta 5022
+
+
+boa pratica:
+rotina para levar outros objetos que não são levados pelo mirror
+usuarios
+jobs
+
+--dba tools
+
+
+ALTER DATABASE [Traces] SET PARTNER OFF  
+
+
+
+

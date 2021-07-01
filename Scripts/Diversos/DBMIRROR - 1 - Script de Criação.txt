@@ -1,0 +1,237 @@
+/*
+Criação dos endpoints participantes do mirror
+--criar usuário do Endpoint como sysadmin nos servidores antes de criar os endpoints
+-- se o telnet não tiver funcionando pode ser o firewall do windows bloqueando
+
+OBSERVAÇÃO IMPORTANTE!!!
+
+VERIFICAR O "Disk Sector Size" NOS DOIS SERVIDORES - JA TIVEMOS PROBLEMAS EM UM CLIENTE QUANDO ESSES VALORES ESTAVAM DIFERENTES
+
+https://blogs.msdn.microsoft.com/saponsqlserver/2014/10/01/message-misaligned-log-ios-which-required-falling-back-to-synchronous-io-in-sql-server-error-log/
+
+
+-- Criação do Endpoint nos dois servidores
+CREATE ENDPOINT [Mirroring] 
+	AUTHORIZATION [DATACENTER\DBMirror]
+	STATE=STARTED
+	AS TCP (LISTENER_PORT = 5022, LISTENER_IP = ALL)
+	FOR DATA_MIRRORING (ROLE = ALL, AUTHENTICATION = WINDOWS NEGOTIATE
+, ENCRYPTION = DISABLED)
+
+
+-- Endpoint do witness
+
+CREATE ENDPOINT [Mirroring] 
+	AUTHORIZATION [DATACENTER\DBMirror]
+	STATE=STARTED
+	AS TCP (LISTENER_PORT = 5022, LISTENER_IP = ALL)
+	FOR DATA_MIRRORING (ROLE = WITNESS, AUTHENTICATION = WINDOWS NEGOTIATE
+, ENCRYPTION = DISABLED)
+
+
+
+-- com essa permissao para o usuario do serviço do SQL Server, ja conseguimos configurar o mirror
+GRANT CONNECT on ENDPOINT::Mirroring_Endpoint_Name TO [domain_name\user_name];
+
+
+*/
+-- fonte
+http://tracyboggiano.com/archive/2014/02/script-to-setup-sql-server-database-mirroring-for-multiple-databases/
+SET NOCOUNT ON
+
+ -- Garantir que os caminhos das databases não serão alterados.
+ -- adicionei COMPRESSION no backup pois o servidor é SQL Server 2008 R2.
+
+DECLARE @primary VARCHAR(128) = 'BD01.datacenter.com' ,
+    @secondary VARCHAR(128) = 'BD02.datacenter.com' ,
+    @witness varchar(128) = 'AD01.datacenter.com',
+    @account VARCHAR(128) = 'DATACENTER\DBMirror' ,
+    @backupnetworkpath varchar(128) = '\\bd02\h$\',
+    @command VARCHAR(MAX) ,
+    @command2 VARCHAR(MAX) ,
+    @rowcount TINYINT = 0 ,
+    @mirroringmode varchar(4) = 'FULL',  --OFF or FULL
+    @newmirror BIT = 0 --if mirroring has not been setup before create the endpoints
+
+IF @mirroringmode = 'OFF' OR @mirroringmode = 'FULL'
+BEGIN
+    CREATE TABLE #databases ( name VARCHAR(128) )
+    INSERT  INTO #databases
+    SELECT  name
+    FROM    sys.databases d
+            LEFT OUTER JOIN sys.database_mirroring m ON m.database_id = d.database_id
+    WHERE   name NOT IN ( 'dba', 'tempdb', 'master', 'msdb', 'model' )
+            AND mirroring_role_desc IS NULL
+          --  and name in ('TesteMirror','Reports_POPTempDB')
+
+    SET @rowcount = @@rowcount
+
+    IF @rowcount > 0 
+    BEGIN
+        PRINT ':CONNECT ' + @primary
+
+        SELECT  'ALTER DATABASE [' + name
+                + '] SET RECOVERY FULL WITH NO_WAIT'
+        FROM    #databases
+
+		 IF @newmirror = 1 
+			BEGIN 
+				PRINT ''
+				PRINT 'IF  NOT EXISTS (SELECT * FROM sys.endpoints e WHERE e.name = N''Mirroring'')' 
+				PRINT 'CREATE ENDPOINT [Mirroring] AUTHORIZATION [' + @account
+					+ '] STATE=STARTED AS TCP (LISTENER_PORT = 5022, LISTENER_IP = ALL) FOR DATA_MIRRORING (ROLE = PARTNER, AUTHENTICATION = WINDOWS NEGOTIATE, ENCRYPTION = REQUIRED ALGORITHM RC4)'
+
+				PRINT ' GO'
+				PRINT ''
+				PRINT ':CONNECT ' + @secondary
+
+				PRINT 'IF  NOT EXISTS (SELECT * FROM sys.endpoints e WHERE e.name = N''Mirroring'')' 
+				PRINT 'CREATE ENDPOINT [Mirroring] AUTHORIZATION [' + @account
+					+ '] STATE=STARTED AS TCP (LISTENER_PORT = 5022, LISTENER_IP = ALL) FOR DATA_MIRRORING (ROLE = PARTNER, AUTHENTICATION = WINDOWS NEGOTIATE, ENCRYPTION = REQUIRED ALGORITHM RC4)'
+				PRINT 'GO'
+
+			END
+
+            PRINT ''
+            PRINT ':CONNECT ' + @primary
+            SELECT  'BACKUP DATABASE [' + name + '] TO  DISK = N''' + @backupnetworkpath + name
+                    + '.bak'' WITH NOFORMAT, INIT,  NAME = N''' + name
+                    + '-Full Database Backup'', SKIP, NOREWIND, NOUNLOAD,  STATS = 10, COMPRESSION'
+            FROM    #databases
+
+            PRINT ''
+            SELECT  'BACKUP LOG [' + name + '] TO  DISK = N''' + @backupnetworkpath + name
+                    + '_Log.bak'' WITH NOFORMAT, INIT,  NAME = N''' + name
+                    + '-Transaction Log  Backup'', SKIP, NOREWIND, NOUNLOAD,  STATS = 10, COMPRESSION'
+            FROM    #databases
+
+             PRINT ''
+            PRINT ':CONNECT ' + @secondary
+            SELECT  'RESTORE DATABASE [' + name + '] FROM  DISK = N''' + @backupnetworkpath + name
+                    + '.bak'' WITH  FILE = 1,  NORECOVERY,  NOUNLOAD,  REPLACE, STATS = 10'
+            FROM    #databases
+
+            SELECT  'RESTORE LOG [' + name + '] FROM  DISK = N''' + @backupnetworkpath + name
+                    + '_log.bak'' WITH  FILE = 1,  NORECOVERY,  NOUNLOAD,  STATS = 10'
+            FROM    #databases
+
+            PRINT ''
+
+            PRINT ':CONNECT ' + @secondary
+
+            SELECT  'ALTER DATABASE [' + name + '] SET PARTNER = N''TCP://' + @primary + ':5022'''
+            FROM    #databases
+
+            PRINT ''
+            
+            SELECT  'ALTER DATABASE [' + name + '] SET witness = N''TCP://' + @witness + ':5022'''
+            FROM    #databases
+
+            PRINT ''
+            
+
+
+            PRINT ':CONNECT ' + @primary
+
+            SELECT  'ALTER DATABASE [' + name + '] SET PARTNER = N''TCP://' + @secondary + ':5022'''
+            FROM    #databases
+
+             PRINT ''
+
+            SELECT  'ALTER DATABASE [' + name + '] SET SAFETY ' + @mirroringmode
+            FROM    #databases
+
+            PRINT ''
+
+            SELECT  'ALTER DATABASE [' + name + '] SET PARTNER TIMEOUT 60'
+            FROM    #databases
+            
+            
+            
+
+            PRINT ''
+
+             IF @newmirror = 1 
+                PRINT 'exec sys.sp_dbmmonitoraddmonitoring'
+
+            IF @newmirror = 1 
+                BEGIN 
+                    PRINT ''
+                    PRINT ':CONNECT ' + @secondary
+                    PRINT 'exec sys.sp_dbmmonitoraddmonitoring'
+                END
+        END
+
+
+    DROP TABLE #databases 
+
+END
+
+
+
+/*
+--desabilitar os jobs de backup
+
+--Executar o script abaixo nos dois servidores para a criação do endpoint que é utilizado na comunicação do mirro
+CREATE ENDPOINT [Mirroring] 
+	AUTHORIZATION [CARTORIO3ZONA\sqlservicos]
+	STATE=STARTED
+	AS TCP (LISTENER_PORT = 5022, LISTENER_IP = ALL)
+	FOR DATA_MIRRORING (ROLE = ALL, AUTHENTICATION = WINDOWS NEGOTIATE
+, ENCRYPTION = DISABLED)
+
+--Realização de um backup FULL e do LOG nas bases que serão espelhadas
+BACKUP DATABASE [IMPORTACAO_ROSTAND] TO  DISK = N'E:\BackupMirroring\IMPORTACAO_ROSTAND.bak' WITH NOFORMAT, INIT,  NAME = N'IMPORTACAO_ROSTAND-Full Database Backup', SKIP, NOREWIND, NOUNLOAD,  STATS = 10, COMPRESSION
+BACKUP DATABASE [QCARTORIO] TO  DISK = N'E:\BackupMirroring\QCARTORIO.bak' WITH NOFORMAT, INIT,  NAME = N'QCARTORIO-Full Database Backup', SKIP, NOREWIND, NOUNLOAD,  STATS = 10, COMPRESSION
+BACKUP DATABASE [QCARTORIO_BINARIOS] TO  DISK = N'E:\BackupMirroring\QCARTORIO_BINARIOS.bak' WITH NOFORMAT, INIT,  NAME = N'QCARTORIO_BINARIOS-Full Database Backup', SKIP, NOREWIND, NOUNLOAD,  STATS = 10, COMPRESSION
+
+BACKUP LOG [IMPORTACAO_ROSTAND] TO  DISK = N'E:\BackupMirroring\IMPORTACAO_ROSTAND_Log.bak' WITH NOFORMAT, INIT,  NAME = N'IMPORTACAO_ROSTAND-Transaction Log  Backup', SKIP, NOREWIND, NOUNLOAD,  STATS = 10, COMPRESSION
+BACKUP LOG [QCARTORIO] TO  DISK = N'E:\BackupMirroring\QCARTORIO_Log.bak' WITH NOFORMAT, INIT,  NAME = N'QCARTORIO-Transaction Log  Backup', SKIP, NOREWIND, NOUNLOAD,  STATS = 10, COMPRESSION
+BACKUP LOG [QCARTORIO_BINARIOS] TO  DISK = N'E:\BackupMirroring\QCARTORIO_BINARIOS_Log.bak' WITH NOFORMAT, INIT,  NAME = N'QCARTORIO_BINARIOS-Transaction Log  Backup', SKIP, NOREWIND, NOUNLOAD,  STATS = 10, COMPRESSION
+
+--Restauração das bases espelhadas
+RESTORE FILELISTONLY FROM DISK = N'E:\Bancos de Dados\IMPORTACAO_ROSTAND.bak' 
+
+RESTORE DATABASE [IMPORTACAO_ROSTAND] FROM  DISK = N'E:\Bancos de Dados\IMPORTACAO_ROSTAND.bak' 
+WITH  FILE = 1,  NORECOVERY,  NOUNLOAD,  REPLACE, STATS = 10,
+MOVE 'impRostand' TO 'E:\Bancos de Dados\IMPORTACAO_ROSTAND.mdf',
+MOVE 'impRostand_log' TO 'E:\Bancos de Dados\IMPORTACAO_ROSTAND_1.ldf'
+
+RESTORE FILELISTONLY FROM DISK = N'E:\Bancos de Dados\QCARTORIO.bak' 
+
+RESTORE DATABASE [QCARTORIO] FROM  DISK = N'E:\Bancos de Dados\QCARTORIO.bak' 
+WITH  FILE = 1,  NORECOVERY,  NOUNLOAD,  REPLACE, STATS = 10,
+MOVE 'Q_CARTORIO_LIMPO_DATA' TO 'E:\Bancos de Dados\QCARTORIO.mdf',
+MOVE 'Q_CARTORIO_LIMPO_LOG' TO 'E:\Bancos de Dados\QCARTORIO_1.ldf'
+
+RESTORE FILELISTONLY FROM DISK = N'E:\Bancos de Dados\QCARTORIO_BINARIOS.bak' 
+
+RESTORE DATABASE [QCARTORIO_BINARIOS] FROM DISK = N'E:\Bancos de Dados\QCARTORIO_BINARIOS.bak' 
+WITH  FILE = 1,  NORECOVERY,  NOUNLOAD,  REPLACE, STATS = 10,
+MOVE 'QCARTORIO_BINARIOS_NOVO' TO 'E:\Bancos de Dados\QCARTORIO_BINARIOS.mdf',
+MOVE 'QCARTORIO_BINARIOS_NOVO_log' TO 'E:\Bancos de Dados\QCARTORIO_BINARIOS_1.ldf'
+
+RESTORE LOG [IMPORTACAO_ROSTAND] FROM  DISK = N'E:\Bancos de Dados\IMPORTACAO_ROSTAND_log.bak' WITH  FILE = 1,  NORECOVERY,  NOUNLOAD,  STATS = 10
+RESTORE LOG [QCARTORIO] FROM  DISK = N'E:\Bancos de Dados\QCARTORIO_log.bak' WITH  FILE = 1,  NORECOVERY,  NOUNLOAD,  STATS = 10
+RESTORE LOG [QCARTORIO_BINARIOS] FROM  DISK = N'E:\Bancos de Dados\QCARTORIO_BINARIOS_log.bak' WITH  FILE = 1,  NORECOVERY,  NOUNLOAD,  STATS = 10
+
+
+--Executar no servidor secundario do mirror
+ALTER DATABASE [IMPORTACAO_ROSTAND] SET PARTNER = N'TCP://srv-db-01.cartorio3zona.local:5022'
+ALTER DATABASE [QCARTORIO] SET PARTNER = N'TCP://srv-db-01.cartorio3zona.local:5022'
+ALTER DATABASE [QCARTORIO_BINARIOS] SET PARTNER = N'TCP://srv-db-01.cartorio3zona.local:5022'
+
+--Executar no servidor primario do mirror
+ALTER DATABASE [IMPORTACAO_ROSTAND] SET PARTNER = N'TCP://srv-db-02.cartorio3zona.local:5022'
+ALTER DATABASE [QCARTORIO] SET PARTNER = N'TCP://srv-db-02.cartorio3zona.local:5022'
+ALTER DATABASE [QCARTORIO_BINARIOS] SET PARTNER = N'TCP://srv-db-02.cartorio3zona.local:5022'
+
+-- Mesmo sem o ambiente ter um servidor de Witness, aumentei o TIMEOUT para failover caso um dia o WITNESS seja adicionado.
+ALTER DATABASE [IMPORTACAO_ROSTAND] SET PARTNER TIMEOUT 60
+ALTER DATABASE [QCARTORIO] SET PARTNER TIMEOUT 60
+ALTER DATABASE [QCARTORIO_BINARIOS] SET PARTNER TIMEOUT 60
+
+-- Leitura sobre o PARTNER TIMEOUT
+http://www.ryanjadams.com/2010/11/sql-mirroring-timeout/#axzz37w9AI5TR
+
+*/
